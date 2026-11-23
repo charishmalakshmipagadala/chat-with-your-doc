@@ -1,0 +1,26 @@
+# Runs PostgreSQL 16 with the pgvector extension for local development.
+# Start:  docker compose up -d
+# Stop:   docker compose down        (data is kept in the "pgdata" volume)
+# Reset:  docker compose down -v     (deletes all data)
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: docchat-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: docchat
+      POSTGRES_PASSWORD: docchat
+      POSTGRES_DB: docchat
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docchat -d docchat"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

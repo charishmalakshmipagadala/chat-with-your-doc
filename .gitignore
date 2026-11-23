@@ -6,6 +6,11 @@ venv/
 
 # Node
 node_modules/
+dist/
+*.log
+
+# Files users upload (PDFs) — stored on disk, not in git
+uploads/
 
 # Secrets and local config
 .env
