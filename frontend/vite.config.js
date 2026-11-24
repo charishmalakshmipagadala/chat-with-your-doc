@@ -9,7 +9,8 @@ export default defineConfig({
     // During development, any request to /api/... is forwarded to our
     // Node backend (built on Day 2), so the browser never sees a different origin.
     proxy: {
-      '/api': 'http://localhost:3001',
+      // API_URL lets you point at a backend on another port (default 3001).
+      '/api': process.env.API_URL || 'http://localhost:3001',
     },
   },
 })

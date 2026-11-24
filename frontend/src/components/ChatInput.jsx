@@ -3,8 +3,9 @@ import { useRef, useState } from 'react'
 const MAX_HEIGHT = 200 // px — after this the box scrolls instead of growing
 
 // Text box at the bottom. Grows as you type.
-// Enter = send, Shift+Enter = new line.
-function ChatInput({ onSend, disabled }) {
+// Enter = send, Shift+Enter = new line. While a reply streams, Send becomes Stop.
+function ChatInput({ onSend, onStop, isReplying }) {
+  const disabled = isReplying
   const [text, setText] = useState('')
   const textareaRef = useRef(null)
 
@@ -47,13 +48,22 @@ function ChatInput({ onSend, disabled }) {
           placeholder="Ask anything…"
           className="flex-1 resize-none bg-transparent px-2 py-2 text-gray-100 placeholder-gray-500 outline-none"
         />
-        <button
-          onClick={send}
-          disabled={disabled || !text.trim()}
-          className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Send
-        </button>
+        {isReplying ? (
+          <button
+            onClick={onStop}
+            className="rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-white"
+          >
+            ■ Stop
+          </button>
+        ) : (
+          <button
+            onClick={send}
+            disabled={!text.trim()}
+            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Send
+          </button>
+        )}
       </div>
       <p className="mt-2 text-center text-xs text-gray-500">
         Enter to send · Shift+Enter for a new line

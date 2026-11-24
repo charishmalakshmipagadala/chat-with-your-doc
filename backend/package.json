@@ -1,0 +1,17 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Plain Node.js backend (no framework) for Chat with your Doc",
+  "main": "src/server.js",
+  "scripts": {
+    "test": "node --test tests/",
+    "dev": "node --watch --env-file=.env src/server.js",
+    "start": "node --env-file=.env src/server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.13.0"
+  }
+}

@@ -2,14 +2,14 @@ import { useEffect, useRef } from 'react'
 import MessageBubble from './MessageBubble.jsx'
 
 // The scrollable message list. Shows a welcome screen when the chat is empty.
-function ChatWindow({ messages, isReplying }) {
+function ChatWindow({ messages }) {
   const bottomRef = useRef(null)
 
-  // Every time a message is added (or the "typing" dots appear),
-  // scroll the invisible marker at the bottom into view.
+  // Every time messages change — a new message, or a new word streamed into
+  // the last one — scroll the invisible marker at the bottom into view.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isReplying])
+  }, [messages])
 
   if (messages.length === 0) {
     return (
@@ -26,15 +26,6 @@ function ChatWindow({ messages, isReplying }) {
         {messages.map((m) => (
           <MessageBubble key={m.id} message={m} />
         ))}
-
-        {isReplying && (
-          <div className="flex gap-1 text-gray-400" aria-label="Assistant is typing">
-            <span className="animate-bounce">●</span>
-            <span className="animate-bounce [animation-delay:150ms]">●</span>
-            <span className="animate-bounce [animation-delay:300ms]">●</span>
-          </div>
-        )}
-
         <div ref={bottomRef} />
       </div>
     </div>
