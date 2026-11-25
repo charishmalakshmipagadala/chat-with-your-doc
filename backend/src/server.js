@@ -4,6 +4,13 @@ import { createRouter } from './lib/router.js'
 import { sendJson, sendError, setCors } from './lib/http.js'
 import { config } from './config.js' // checks required settings at startup
 import { chatHandler } from './routes/chat.js'
+import {
+  createConversation,
+  listConversations,
+  getConversationMessages,
+  deleteConversation,
+} from './routes/conversations.js'
+import { pool, initDb } from './db/pool.js'
 
 const PORT = config.port
 
@@ -11,11 +18,22 @@ const PORT = config.port
 // Every handler has the same shape: (req, res, params, url) => { ... }
 const router = createRouter()
 
-router.add('GET', '/api/health', (req, res) => {
-  sendJson(res, 200, { ok: true })
+// Health check: is the server up, and can it reach the database?
+router.add('GET', '/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1')
+    sendJson(res, 200, { ok: true, db: 'up' })
+  } catch {
+    sendJson(res, 503, { ok: false, db: 'down' })
+  }
 })
 
 router.add('POST', '/api/chat', chatHandler)
+
+router.add('POST', '/api/conversations', createConversation)
+router.add('GET', '/api/conversations', listConversations)
+router.add('GET', '/api/conversations/:id/messages', getConversationMessages)
+router.add('DELETE', '/api/conversations/:id', deleteConversation)
 
 // ---- The server -----------------------------------------------------------
 // This ONE function receives every request.
@@ -53,6 +71,15 @@ const server = http.createServer(async (req, res) => {
     }
   }
 })
+
+// Make sure the database is reachable before we accept any requests.
+try {
+  await initDb()
+} catch (err) {
+  console.error(`\n❌ Can't use the database: ${err.message}`)
+  console.error('   Is it running? Try: docker compose up -d   (then: npm run migrate)\n')
+  process.exit(1)
+}
 
 server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`)

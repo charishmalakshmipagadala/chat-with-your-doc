@@ -1,109 +1,147 @@
-import { useRef, useState } from 'react'
-import { streamChat } from '../api/client.js'
+import { useEffect, useRef, useState } from 'react'
+import * as api from '../api/client.js'
 
-// Made-up chats so the sidebar isn't empty. Replaced by the real API on Day 3.
-const SAMPLE_CHATS = [
-  {
-    id: 'c1',
-    title: 'What is this paper about?',
-    messages: [
-      { id: 'm1', role: 'user', content: 'What is this paper about?' },
-      {
-        id: 'm2',
-        role: 'assistant',
-        content:
-          'The paper introduces a **new method** for document search. Key points:\n\n- It splits text into chunks\n- It turns each chunk into an embedding\n- It finds the closest chunks to your question',
-      },
-    ],
-  },
-]
+const TITLE_LENGTH = 40
+
+// Same rule the server uses, so the sidebar shows the right title immediately.
+const makeTitle = (text) => text.replace(/\s+/g, ' ').trim().slice(0, TITLE_LENGTH)
 
 /**
  * All chat state and actions in one custom hook, so components stay simple.
- * A "custom hook" is just a function whose name starts with `use` and that
- * calls other hooks (useState, useRef, ...).
+ *
+ * The server is the source of truth: chats and messages live in the database.
+ * This hook keeps a copy of
+ *   - the list of chats (for the sidebar)
+ *   - the messages of the ONE chat that is open
+ *
+ * activeId === null means "a new chat that isn't saved yet". It's created on
+ * the server when you send its first message, so empty chats don't pile up.
  */
 export function useChat() {
-  const [conversations, setConversations] = useState(SAMPLE_CHATS)
-  const [activeId, setActiveId] = useState(SAMPLE_CHATS[0].id)
+  const [conversations, setConversations] = useState([])
+  const [activeId, setActiveId] = useState(null)
+  const [messages, setMessages] = useState([])
   const [isReplying, setIsReplying] = useState(false)
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [error, setError] = useState(null) // shown as a banner
 
-  // The AbortController of the reply that is streaming right now.
-  // useRef, not useState: changing it shouldn't re-render anything.
-  const abortRef = useRef(null)
+  const abortRef = useRef(null) // AbortController of the streaming reply
+  const openingRef = useRef(null) // the chat we most recently asked to open
 
-  const active = conversations.find((c) => c.id === activeId)
+  // ---- loading ---------------------------------------------------------------
 
-  // ---- small helpers that update state immutably ----------------------------
-
-  function updateChat(chatId, change) {
-    setConversations((prev) => prev.map((c) => (c.id === chatId ? change(c) : c)))
+  async function refreshConversations() {
+    try {
+      setConversations(await api.listConversations())
+    } catch (err) {
+      setError(`Couldn't load your chats: ${err.message}`)
+    }
   }
 
-  function addMessage(chatId, message) {
-    updateChat(chatId, (c) => ({
-      ...c,
-      // Title the chat with the first 40 characters of its first question.
-      title: c.messages.length === 0 ? message.content.slice(0, 40) : c.title,
-      messages: [...c.messages, message],
-    }))
-  }
+  // Load the sidebar once, when the app first appears.
+  useEffect(() => {
+    refreshConversations()
+  }, [])
 
-  function updateMessage(chatId, messageId, change) {
-    updateChat(chatId, (c) => ({
-      ...c,
-      messages: c.messages.map((m) => (m.id === messageId ? { ...m, ...change(m) } : m)),
-    }))
-  }
+  async function selectChat(id) {
+    if (isReplying || id === activeId) return
+    openingRef.current = id
+    setActiveId(id)
+    setMessages([])
+    setError(null)
+    setIsLoadingMessages(true)
 
-  // ---- actions --------------------------------------------------------------
+    try {
+      const data = await api.getConversation(id)
+      // If you clicked another chat while this one was loading, ignore this
+      // (now outdated) answer — otherwise the wrong messages would appear.
+      if (openingRef.current !== id) return
+      setMessages(data.messages)
+    } catch (err) {
+      if (openingRef.current === id) setError(`Couldn't open this chat: ${err.message}`)
+    } finally {
+      if (openingRef.current === id) setIsLoadingMessages(false)
+    }
+  }
 
   function newChat() {
     if (isReplying) return
-    const chat = { id: crypto.randomUUID(), title: 'New chat', messages: [] }
-    setConversations((prev) => [chat, ...prev])
-    setActiveId(chat.id)
+    openingRef.current = null
+    setActiveId(null)
+    setMessages([])
+    setError(null)
+    setIsLoadingMessages(false)
   }
 
-  function selectChat(id) {
-    if (!isReplying) setActiveId(id)
+  async function deleteChat(id) {
+    if (isReplying) return
+    try {
+      await api.deleteConversation(id)
+    } catch (err) {
+      setError(`Couldn't delete the chat: ${err.message}`)
+      return
+    }
+    setConversations((prev) => prev.filter((c) => c.id !== id))
+    if (id === activeId) newChat()
+  }
+
+  // ---- sending ---------------------------------------------------------------
+
+  function updateReply(replyId, change) {
+    setMessages((prev) => prev.map((m) => (m.id === replyId ? { ...m, ...change(m) } : m)))
   }
 
   async function send(text) {
-    if (isReplying || !active) return
-    const chatId = active.id
+    if (isReplying || isLoadingMessages) return
+    const isFirstMessage = messages.length === 0
+    setError(null)
 
-    // History for Claude: earlier messages that have real content, plus the new one.
-    // (Error bubbles and empty stopped replies are left out.)
-    const history = active.messages
-      .filter((m) => !m.error && m.content.trim())
-      .map(({ role, content }) => ({ role, content }))
-    history.push({ role: 'user', content: text })
-
-    addMessage(chatId, { id: crypto.randomUUID(), role: 'user', content: text })
-
-    // An empty assistant message that we fill in as text arrives.
+    // Show your message and an empty reply bubble right away.
+    // (Temporary ids; after a reload the messages get their database ids.)
     const replyId = crypto.randomUUID()
-    addMessage(chatId, { id: replyId, role: 'assistant', content: '', streaming: true })
+    setMessages((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), role: 'user', content: text },
+      { id: replyId, role: 'assistant', content: '', streaming: true },
+    ])
 
     const controller = new AbortController()
     abortRef.current = controller
     setIsReplying(true)
 
     try {
-      for await (const piece of streamChat(history, { signal: controller.signal })) {
-        updateMessage(chatId, replyId, (m) => ({ content: m.content + piece }))
+      // A brand-new chat is created on the server only now.
+      let chatId = activeId
+      if (!chatId) {
+        const created = await api.createConversation()
+        chatId = created.id
+        openingRef.current = chatId
+        setActiveId(chatId)
+        setConversations((prev) => [created, ...prev])
+      }
+
+      // Update the sidebar right away: this chat moves to the top, and its
+      // first message becomes the title. (The server does the same.)
+      setConversations((prev) => {
+        const chat = prev.find((c) => c.id === chatId)
+        const others = prev.filter((c) => c.id !== chatId)
+        return chat ? [{ ...chat, title: isFirstMessage ? makeTitle(text) : chat.title }, ...others] : prev
+      })
+
+      for await (const piece of api.streamChat(chatId, text, { signal: controller.signal })) {
+        updateReply(replyId, (m) => ({ content: m.content + piece }))
       }
     } catch (err) {
       if (controller.signal.aborted) {
-        updateMessage(chatId, replyId, () => ({ stopped: true })) // user pressed Stop
+        updateReply(replyId, () => ({ stopped: true })) // user pressed Stop
       } else {
-        updateMessage(chatId, replyId, () => ({ error: err.message || 'Something went wrong' }))
+        updateReply(replyId, () => ({ error: err.message || 'Something went wrong' }))
       }
     } finally {
-      updateMessage(chatId, replyId, () => ({ streaming: false }))
+      updateReply(replyId, () => ({ streaming: false }))
       abortRef.current = null
       setIsReplying(false)
+      refreshConversations() // get the saved titles and order from the server
     }
   }
 
@@ -114,10 +152,13 @@ export function useChat() {
   return {
     conversations,
     activeId,
-    messages: active ? active.messages : [],
+    messages,
     isReplying,
+    isLoadingMessages,
+    error,
     newChat,
     selectChat,
+    deleteChat,
     send,
     stop,
   }

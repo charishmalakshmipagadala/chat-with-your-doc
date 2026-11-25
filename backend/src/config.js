@@ -17,6 +17,7 @@ const fakeLlm = process.env.FAKE_LLM === 'true'
 
 export const config = {
   port: Number(process.env.PORT) || 3001,
+  databaseUrl: required('DATABASE_URL'),
   fakeLlm,
   // The key is only required when we really call Claude.
   anthropicApiKey: fakeLlm ? process.env.ANTHROPIC_API_KEY : required('ANTHROPIC_API_KEY'),

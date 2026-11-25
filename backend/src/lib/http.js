@@ -33,6 +33,14 @@ export async function readJson(req) {
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// IDs in URLs come from the user. If one isn't a valid UUID, no row can have
+// it — answer 404 right away instead of letting Postgres throw a type error (500).
+export function assertUuid(id, what = 'Item') {
+  if (!UUID_RE.test(id)) throw new HttpError(404, `${what} not found`)
+}
+
 export function sendJson(res, status, data) {
   res.writeHead(status, { 'Content-Type': 'application/json' })
   res.end(JSON.stringify(data))

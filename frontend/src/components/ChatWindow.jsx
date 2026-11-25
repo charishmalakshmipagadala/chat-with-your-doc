@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import MessageBubble from './MessageBubble.jsx'
 
 // The scrollable message list. Shows a welcome screen when the chat is empty.
-function ChatWindow({ messages }) {
+function ChatWindow({ messages, isLoading }) {
   const bottomRef = useRef(null)
 
   // Every time messages change — a new message, or a new word streamed into
@@ -10,6 +10,12 @@ function ChatWindow({ messages }) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-gray-400">Loading chat…</div>
+    )
+  }
 
   if (messages.length === 0) {
     return (

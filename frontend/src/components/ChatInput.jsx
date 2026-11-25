@@ -4,8 +4,8 @@ const MAX_HEIGHT = 200 // px — after this the box scrolls instead of growing
 
 // Text box at the bottom. Grows as you type.
 // Enter = send, Shift+Enter = new line. While a reply streams, Send becomes Stop.
-function ChatInput({ onSend, onStop, isReplying }) {
-  const disabled = isReplying
+function ChatInput({ onSend, onStop, isReplying, disabled: disabledProp = false }) {
+  const disabled = isReplying || disabledProp
   const [text, setText] = useState('')
   const textareaRef = useRef(null)
 
@@ -58,7 +58,7 @@ function ChatInput({ onSend, onStop, isReplying }) {
         ) : (
           <button
             onClick={send}
-            disabled={!text.trim()}
+            disabled={disabled || !text.trim()}
             className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Send
