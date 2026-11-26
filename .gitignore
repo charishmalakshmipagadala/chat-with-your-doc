@@ -12,6 +12,9 @@ dist/
 # Files users upload (PDFs) — stored on disk, not in git
 uploads/
 
+# Downloaded AI model files (embeddings) — re-downloaded automatically
+.cache/
+
 # Secrets and local config
 .env
 .env.*

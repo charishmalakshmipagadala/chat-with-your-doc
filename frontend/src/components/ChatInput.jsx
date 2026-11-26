@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
+import UploadButton from './UploadButton.jsx'
 
 const MAX_HEIGHT = 200 // px — after this the box scrolls instead of growing
 
 // Text box at the bottom. Grows as you type.
 // Enter = send, Shift+Enter = new line. While a reply streams, Send becomes Stop.
-function ChatInput({ onSend, onStop, isReplying, disabled: disabledProp = false }) {
+function ChatInput({ onSend, onStop, onUpload, isReplying, disabled: disabledProp = false }) {
   const disabled = isReplying || disabledProp
   const [text, setText] = useState('')
   const textareaRef = useRef(null)
@@ -36,6 +37,7 @@ function ChatInput({ onSend, onStop, isReplying, disabled: disabledProp = false 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-6">
       <div className="flex items-end gap-2 rounded-2xl border border-gray-700 bg-gray-800 p-2">
+        {onUpload && <UploadButton onUpload={onUpload} />}
         <textarea
           ref={textareaRef}
           rows={1}

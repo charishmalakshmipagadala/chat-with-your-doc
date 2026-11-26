@@ -10,7 +10,10 @@ import {
   getConversationMessages,
   deleteConversation,
 } from './routes/conversations.js'
+import { uploadDocument, listDocuments, getDocument } from './routes/documents.js'
 import { pool, initDb } from './db/pool.js'
+import { warmUpEmbeddings } from './services/embeddings.js'
+import { resumePendingIngests } from './services/ingest.js'
 
 const PORT = config.port
 
@@ -34,6 +37,10 @@ router.add('POST', '/api/conversations', createConversation)
 router.add('GET', '/api/conversations', listConversations)
 router.add('GET', '/api/conversations/:id/messages', getConversationMessages)
 router.add('DELETE', '/api/conversations/:id', deleteConversation)
+
+router.add('POST', '/api/documents', uploadDocument)
+router.add('GET', '/api/documents', listDocuments)
+router.add('GET', '/api/documents/:id', getDocument)
 
 // ---- The server -----------------------------------------------------------
 // This ONE function receives every request.
@@ -83,4 +90,6 @@ try {
 
 server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`)
+  warmUpEmbeddings() // load the embedding model in the background
+  resumePendingIngests().catch((err) => console.error('Could not resume processing:', err.message))
 })

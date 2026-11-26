@@ -1,6 +1,7 @@
 // All settings in one place, read from process.env (loaded from .env by
 // `node --env-file=.env`). Other files import from here instead of reading
 // process.env directly, so a missing setting is caught once, at startup.
+import { fileURLToPath } from 'node:url'
 
 function required(name) {
   const value = process.env[name]?.trim()
@@ -17,6 +18,10 @@ const fakeLlm = process.env.FAKE_LLM === 'true'
 
 export const config = {
   port: Number(process.env.PORT) || 3001,
+  // Uploaded PDFs go in backend/uploads/ (git-ignored), wherever you start the server from.
+  uploadDir: fileURLToPath(new URL('../uploads/', import.meta.url)),
+  // Downloaded AI model files for embeddings (git-ignored).
+  modelCacheDir: fileURLToPath(new URL('../.cache/models/', import.meta.url)),
   databaseUrl: required('DATABASE_URL'),
   fakeLlm,
   // The key is only required when we really call Claude.

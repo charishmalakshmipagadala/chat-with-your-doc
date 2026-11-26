@@ -28,6 +28,32 @@ export const getConversation = (id) => request(`/api/conversations/${id}/message
 
 export const deleteConversation = (id) => request(`/api/conversations/${id}`, { method: 'DELETE' })
 
+// ---- Documents --------------------------------------------------------------
+
+/** @returns {Promise<{ id, filename, status, error, chunkCount, createdAt }[]>} newest first */
+export const listDocuments = () => request('/api/documents')
+
+export const getDocument = (id) => request(`/api/documents/${id}`)
+
+/**
+ * Upload a PDF. Resolves as soon as the server has saved it (status
+ * 'processing'); poll getDocument() to find out when it's 'ready'.
+ * @param {File} file
+ */
+export async function uploadDocument(file) {
+  const form = new FormData()
+  form.append('file', file) // the server reads the field named "file"
+
+  // Don't set Content-Type yourself: the browser adds
+  // "multipart/form-data; boundary=..." with the right boundary.
+  const res = await fetch('/api/documents', { method: 'POST', body: form })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || `Upload failed (${res.status})`)
+  }
+  return res.json()
+}
+
 // ---- Chat streaming ---------------------------------------------------------
 
 /**
