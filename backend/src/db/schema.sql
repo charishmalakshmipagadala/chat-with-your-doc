@@ -54,3 +54,7 @@ CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages (conversation_i
 -- Day 5: the document pages an assistant answer was based on, e.g.
 -- [{"pageNumber": 3, "score": 0.61, "excerpt": "..."}]. NULL for normal chats.
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS sources jsonb;
+
+-- Day 6: starter questions for a document, generated once by Claude and kept
+-- so we don't pay to generate them again. e.g. ["What is ...?", ...]
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS suggested_questions jsonb;

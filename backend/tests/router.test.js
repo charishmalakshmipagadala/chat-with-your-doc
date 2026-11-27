@@ -51,6 +51,16 @@ test('does not match partial or extra segments', () => {
   assert.equal(router.match('GET', '/xx/api/conversations/1'), null)
 })
 
+test('allowedMethods lists the methods registered for a path', () => {
+  const router = createRouter()
+  router.add('GET', '/api/conversations/:id/messages', noop)
+  router.add('DELETE', '/api/conversations/:id', noop)
+  router.add('GET', '/api/conversations/:id', noop)
+
+  assert.deepEqual(router.allowedMethods('/api/conversations/7').sort(), ['DELETE', 'GET'])
+  assert.deepEqual(router.allowedMethods('/api/nothing-here'), [])
+})
+
 test('picks the right handler among several routes', () => {
   const router = createRouter()
   const list = () => {}

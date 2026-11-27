@@ -35,5 +35,18 @@ export function createRouter() {
     return null
   }
 
-  return { add, match }
+  /**
+   * Which methods ARE registered for this path? Used to answer
+   * "405 Method Not Allowed" (the path exists, but not with that method)
+   * instead of a misleading "404 Not Found".
+   */
+  function allowedMethods(pathname) {
+    const methods = new Set()
+    for (const route of routes) {
+      if (route.regex.test(pathname)) methods.add(route.method)
+    }
+    return [...methods]
+  }
+
+  return { add, match, allowedMethods }
 }

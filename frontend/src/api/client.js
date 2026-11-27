@@ -3,11 +3,12 @@
 
 // One helper for all normal (non-streaming) JSON requests.
 // Turns any error response into a thrown Error carrying the server's message.
-async function request(path, { method = 'GET', body } = {}) {
+async function request(path, { method = 'GET', body, signal } = {}) {
   const res = await fetch(path, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
+    signal,
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
@@ -36,6 +37,20 @@ export const deleteConversation = (id) => request(`/api/conversations/${id}`, { 
 export const listDocuments = () => request('/api/documents')
 
 export const getDocument = (id) => request(`/api/documents/${id}`)
+
+/** @returns {Promise<{ questions: string[] }>} starter questions (may be empty) */
+export const getSuggestedQuestions = (id, { signal } = {}) =>
+  request(`/api/documents/${id}/suggestions`, { signal })
+
+/**
+ * Find passages in a document by meaning (no AI involved).
+ * @returns {Promise<{ query, results: { pageNumber, chunkIndex, score, text }[] }>}
+ */
+export function searchDocument(id, query, { limit = 5, signal } = {}) {
+  // URLSearchParams encodes special characters (&, ?, +, %, spaces) for us.
+  const params = new URLSearchParams({ q: query, limit: String(limit) })
+  return request(`/api/documents/${id}/search?${params}`, { signal })
+}
 
 /**
  * Upload a PDF. Resolves as soon as the server has saved it (status

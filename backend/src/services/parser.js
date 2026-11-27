@@ -29,7 +29,10 @@ export async function extractPages(data) {
  * @returns {string[]}
  */
 export function chunkText(text, { size = CHUNK_SIZE, overlap = CHUNK_OVERLAP } = {}) {
-  const clean = text.replace(/\s+/g, ' ').trim() // PDFs are full of stray line breaks
+  const clean = text
+    .replaceAll('\u0000', '') // NUL can't be stored in Postgres text (some PDFs contain it)
+    .replace(/\s+/g, ' ') // PDFs are full of stray line breaks
+    .trim()
   if (!clean) return []
   if (clean.length <= size) return [clean]
 

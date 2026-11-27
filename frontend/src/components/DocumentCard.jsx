@@ -3,7 +3,7 @@
 const BADGES = {
   uploading: { label: 'Uploading…', className: 'bg-blue-900/60 text-blue-300 animate-pulse' },
   processing: { label: 'Processing…', className: 'bg-yellow-900/60 text-yellow-300 animate-pulse' },
-  ready: { label: 'Ready', className: 'bg-green-900/60 text-green-300' },
+  ready: { label: 'Ready', className: 'bg-green-900/60 text-green-200' },
   failed: { label: 'Failed', className: 'bg-red-900/60 text-red-300' },
 }
 
@@ -25,7 +25,7 @@ function DocumentCard({ document, onChat, disabled }) {
         </span>
         {document.status === 'ready' && (
           <>
-            <span className="text-xs text-gray-500">{document.chunkCount} chunks</span>
+            <span className="text-xs text-gray-400">{document.chunkCount} chunks</span>
             {onChat && (
               <button
                 onClick={() => onChat(document)}

@@ -16,6 +16,13 @@ function required(name) {
 // Free, works offline, and needs no API key or credit.
 const fakeLlm = process.env.FAKE_LLM === 'true'
 
+// A common mistake: pasting only part of the key, or the wrong value. Anthropic
+// keys start with "sk-ant-". Warn early instead of failing on the first chat.
+const key = process.env.ANTHROPIC_API_KEY?.trim()
+if (!fakeLlm && key && !key.startsWith('sk-ant-')) {
+  console.warn('⚠️  ANTHROPIC_API_KEY does not look like an Anthropic key (should start with "sk-ant-").')
+}
+
 export const config = {
   port: Number(process.env.PORT) || 3001,
   // Uploaded PDFs go in backend/uploads/ (git-ignored), wherever you start the server from.

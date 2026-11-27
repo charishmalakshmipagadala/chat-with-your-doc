@@ -15,12 +15,14 @@ function TypingDots() {
 function Sources({ sources }) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-gray-800 pt-2">
-      <span className="text-xs text-gray-500">Sources:</span>
+      <span className="text-xs text-gray-400">Sources:</span>
       {sources.map((s) => (
         <span
           key={s.pageNumber}
           tabIndex={0}
-          title={`Page ${s.pageNumber} (match ${Math.round(s.score * 100)}%)\n\n“${s.excerpt}…”`}
+          title={`Page ${s.pageNumber} ${
+            s.score > 0 ? `(match ${Math.round(s.score * 100)}%)` : '(general context)'
+          }\n\n“${s.excerpt}…”`}
           className="cursor-help rounded-full border border-indigo-800 bg-indigo-950/60 px-2 py-0.5 text-xs text-indigo-300 hover:bg-indigo-900"
         >
           📄 p. {s.pageNumber}
@@ -54,7 +56,7 @@ function MessageBubble({ message }) {
         {/* A blinking block cursor while words are still arriving */}
         {streaming && content && <span className="ml-0.5 animate-pulse">▍</span>}
 
-        {stopped && <p className="mt-1 text-sm italic text-gray-500">Stopped.</p>}
+        {stopped && <p className="mt-1 text-sm italic text-gray-400">Stopped.</p>}
 
         {error && (
           <p className="mt-1 rounded-lg border border-red-800 bg-red-950/50 px-3 py-2 text-sm text-red-300">

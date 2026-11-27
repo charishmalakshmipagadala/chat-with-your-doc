@@ -5,6 +5,16 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Chat with your Doc</title>
+    <script>
+      // Apply the saved theme BEFORE the page is drawn, so it never flashes
+      // in the wrong colors while React loads. (Same logic as useTheme.js.)
+      try {
+        const theme = localStorage.getItem('theme')
+        if (theme === 'light' || theme === 'dark') document.documentElement.classList.add(theme)
+      } catch {
+        // storage blocked (private mode etc.): just follow the system setting
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -18,6 +18,15 @@ test('with no matching chunks, the prompt says so (so Claude can answer "not fou
   assert.doesNotMatch(msg, /<excerpt/)
 })
 
+test('overview mode says the excerpts are general context, not matches', () => {
+  const msg = buildRagUserMessage('report.pdf', [chunk(1, 0), chunk(9, 0)], 'What is this about?', {
+    overview: true,
+  })
+  assert.match(msg, /No excerpt closely matched this question/)
+  assert.match(msg, /general context/)
+  assert.match(msg, /<excerpt page="9">/)
+})
+
 test('sources: one per page (best score), in page order, with a short excerpt', () => {
   const sources = toSources([chunk(5, 0.5), chunk(2, 0.3), chunk(5, 0.7, 'x'.repeat(500))])
   assert.deepEqual(

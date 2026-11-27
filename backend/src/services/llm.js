@@ -60,6 +60,43 @@ async function* streamClaudeReply(messages, { signal, system = SYSTEM_PROMPT } =
   }
 }
 
+/**
+ * Ask Claude for starter questions about a document, as structured JSON.
+ *
+ * `output_config.format` with a JSON schema makes Claude's reply follow that
+ * exact shape — here { "questions": ["...", ...] } — so we can JSON.parse it
+ * safely instead of hoping free text is formatted the way we want.
+ *
+ * @param {string} prompt  instructions + document excerpts
+ * @returns {Promise<string[]>}
+ */
+export async function suggestQuestions(prompt) {
+  const response = await getClient().beta.messages.create({
+    model: config.model,
+    max_tokens: 16000,
+    messages: [{ role: 'user', content: prompt }],
+    output_config: {
+      effort: 'low', // a simple task: no need to think hard
+      format: {
+        type: 'json_schema',
+        schema: {
+          type: 'object',
+          properties: { questions: { type: 'array', items: { type: 'string' } } },
+          required: ['questions'],
+          additionalProperties: false,
+        },
+      },
+    },
+    betas: ['server-side-fallback-2026-07-01'],
+    fallbacks: 'default',
+  })
+
+  if (response.stop_reason === 'refusal') return []
+  const text = response.content.find((b) => b.type === 'text')?.text ?? '{}'
+  const { questions } = JSON.parse(text)
+  return Array.isArray(questions) ? questions : []
+}
+
 const FAKE_WORD_DELAY_MS = 40
 
 // Pretends to be Claude: streams a canned Markdown reply word by word.

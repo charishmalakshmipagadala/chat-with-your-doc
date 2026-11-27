@@ -19,8 +19,13 @@ Rules:
  * The final user message: the excerpts, then the question.
  * XML-style tags make it unambiguous where each excerpt starts and ends,
  * and which page it came from.
+ *
+ * @param {{ overview?: boolean }} options
+ *   overview: true when no chunk matched the question closely, and `chunks`
+ *   is a spread from across the document instead (for broad questions like
+ *   "What is this about?"). The header tells Claude so.
  */
-export function buildRagUserMessage(documentName, chunks, question) {
+export function buildRagUserMessage(documentName, chunks, question, { overview = false } = {}) {
   const excerpts =
     chunks.length > 0
       ? chunks
@@ -28,7 +33,11 @@ export function buildRagUserMessage(documentName, chunks, question) {
           .join('\n\n')
       : '(No part of the document matched this question.)'
 
-  return `Excerpts from the document "${documentName}":
+  const header = overview
+    ? `No excerpt closely matched this question, so here are parts from across the document "${documentName}" for general context:`
+    : `Excerpts from the document "${documentName}":`
+
+  return `${header}
 
 ${excerpts}
 

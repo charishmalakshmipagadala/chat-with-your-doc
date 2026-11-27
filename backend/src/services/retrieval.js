@@ -40,3 +40,30 @@ export async function findRelevantChunks(
   )
   return rows.filter((r) => r.score >= minScore)
 }
+
+/**
+ * A spread of chunks from across the whole document (beginning, middle, end).
+ *
+ * Used when a question doesn't closely match any single chunk — typically
+ * broad questions like "What is this document about?" or "Summarize it" —
+ * and to give Claude an overview when writing starter questions.
+ *
+ * @returns {Promise<{ pageNumber: number, chunkIndex: number, text: string, score: number }[]>}
+ *   score is 0: these were not chosen by similarity.
+ */
+export async function sampleDocumentChunks(documentId, { maxChunks = 4, maxChars = 6000 } = {}) {
+  const { rows } = await pool.query(
+    `SELECT page_number AS "pageNumber", chunk_index AS "chunkIndex", text
+       FROM chunks WHERE document_id = $1 ORDER BY chunk_index`,
+    [documentId],
+  )
+  const step = Math.max(1, Math.floor(rows.length / maxChunks))
+  const sample = []
+  let chars = 0
+  for (let i = 0; i < rows.length && sample.length < maxChunks; i += step) {
+    if (chars + rows[i].text.length > maxChars && sample.length > 0) break
+    sample.push({ ...rows[i], score: 0 })
+    chars += rows[i].text.length
+  }
+  return sample
+}

@@ -5,7 +5,7 @@
 //   GET    /api/conversations/:id/messages   one chat + all its messages
 //   DELETE /api/conversations/:id            delete a chat (and its messages)
 import { pool } from '../db/pool.js'
-import { readJson, sendJson, HttpError, assertUuid } from '../lib/http.js'
+import { readJson, sendJson, HttpError, assertUuid, stripNul } from '../lib/http.js'
 
 const MAX_TITLE_LENGTH = 100
 
@@ -28,10 +28,9 @@ export async function createConversation(req, res) {
 
   let title = 'New chat'
   if (body.title !== undefined) {
-    if (typeof body.title !== 'string' || !body.title.trim()) {
-      throw new HttpError(400, '"title" must be non-empty text')
-    }
-    title = body.title.trim().slice(0, MAX_TITLE_LENGTH)
+    const clean = typeof body.title === 'string' ? stripNul(body.title).trim() : ''
+    if (!clean) throw new HttpError(400, '"title" must be non-empty text')
+    title = clean.slice(0, MAX_TITLE_LENGTH)
   }
 
   // Optional: link the chat to an uploaded document ("chat with this PDF").

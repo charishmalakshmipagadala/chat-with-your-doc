@@ -33,6 +33,13 @@ export async function readJson(req) {
   }
 }
 
+// Postgres text columns can't store the NUL character (\u0000) — trying to
+// throws "invalid byte sequence". It's invisible and never meaningful, so
+// remove it from any text before it goes into the database.
+export function stripNul(text) {
+  return text.replaceAll('\u0000', '')
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // IDs in URLs come from the user. If one isn't a valid UUID, no row can have

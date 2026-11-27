@@ -3,14 +3,22 @@
 //   POST /api/documents        upload a PDF (form field "file")
 //   GET  /api/documents        list documents, newest first
 //   GET  /api/documents/:id    one document (the frontend polls this for status)
+//   GET  /api/documents/:id/search?q=...&limit=5   find passages (no AI involved)
+//   GET  /api/documents/:id/suggestions   starter questions (generated once, cached)
 import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile, unlink } from 'node:fs/promises'
 import path from 'node:path'
 import { pool } from '../db/pool.js'
 import { config } from '../config.js'
-import { sendJson, HttpError, assertUuid } from '../lib/http.js'
+import { sendJson, HttpError, assertUuid, stripNul } from '../lib/http.js'
 import { readFormData } from '../lib/upload.js'
 import { enqueueIngest } from '../services/ingest.js'
+import { findRelevantChunks, MIN_SCORE } from '../services/retrieval.js'
+import { getSuggestedQuestions } from '../services/suggestions.js'
+
+const MAX_QUERY_LENGTH = 500
+const DEFAULT_SEARCH_LIMIT = 5
+const MAX_SEARCH_LIMIT = 20
 
 const MAX_FILENAME_LENGTH = 255
 
@@ -46,7 +54,8 @@ export async function uploadDocument(req, res) {
   // the folder (e.g. a name like "../../server.js").
   const id = randomUUID()
   const filePath = path.join(config.uploadDir, `${id}.pdf`)
-  const filename = path.basename(file.name || 'document.pdf').slice(0, MAX_FILENAME_LENGTH)
+  const filename =
+    path.basename(stripNul(file.name || '').trim() || 'document.pdf').slice(0, MAX_FILENAME_LENGTH)
 
   await mkdir(config.uploadDir, { recursive: true })
   await writeFile(filePath, data)
@@ -83,4 +92,58 @@ export async function getDocument(req, res, params) {
   )
   if (rows.length === 0) throw new HttpError(404, 'Document not found')
   sendJson(res, 200, rows[0])
+}
+
+// Search one document by meaning — the same retrieval that powers chat, but
+// the matching passages are returned directly instead of going to Claude.
+// Free and instant: only the local embedding model and the database are used.
+export async function searchDocument(req, res, params, url) {
+  assertUuid(params.id, 'Document')
+
+  // Query-string values: /search?q=whale%20food&limit=3
+  // url.searchParams decodes them for us (%20 → space, etc.).
+  const query = (url.searchParams.get('q') ?? '').trim()
+  if (!query) throw new HttpError(400, 'Add a search query, e.g. ?q=your+question')
+  if (query.length > MAX_QUERY_LENGTH) {
+    throw new HttpError(400, `Search query too long (max ${MAX_QUERY_LENGTH} characters)`)
+  }
+
+  const limitParam = url.searchParams.get('limit')
+  let limit = DEFAULT_SEARCH_LIMIT
+  if (limitParam !== null) {
+    limit = Number(limitParam)
+    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_SEARCH_LIMIT) {
+      throw new HttpError(400, `"limit" must be a whole number from 1 to ${MAX_SEARCH_LIMIT}`)
+    }
+  }
+
+  const { rows } = await pool.query(`SELECT status FROM documents WHERE id = $1`, [params.id])
+  if (rows.length === 0) throw new HttpError(404, 'Document not found')
+  if (rows[0].status !== 'ready') {
+    throw new HttpError(409, 'This document is not ready to search yet')
+  }
+
+  const chunks = await findRelevantChunks(params.id, query, { topK: limit, minScore: MIN_SCORE })
+  sendJson(res, 200, {
+    query,
+    results: chunks.map((c) => ({
+      pageNumber: c.pageNumber,
+      chunkIndex: c.chunkIndex,
+      score: Number(c.score.toFixed(3)),
+      text: c.text,
+    })),
+  })
+}
+
+// Starter questions for an empty document chat (generated once, then cached).
+export async function getDocumentSuggestions(req, res, params) {
+  assertUuid(params.id, 'Document')
+  const { rows } = await pool.query(
+    `SELECT id, filename, status, suggested_questions FROM documents WHERE id = $1`,
+    [params.id],
+  )
+  if (rows.length === 0) throw new HttpError(404, 'Document not found')
+  if (rows[0].status !== 'ready') throw new HttpError(409, 'This document is not ready yet')
+
+  sendJson(res, 200, { questions: await getSuggestedQuestions(rows[0]) })
 }

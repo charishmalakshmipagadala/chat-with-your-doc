@@ -36,7 +36,7 @@ function ChatInput({ onSend, onStop, onUpload, isReplying, disabled: disabledPro
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-6">
-      <div className="flex items-end gap-2 rounded-2xl border border-gray-700 bg-gray-800 p-2">
+      <div className="flex items-end gap-2 rounded-2xl border border-gray-700 bg-gray-800 p-2 focus-within:border-indigo-500">
         {onUpload && <UploadButton onUpload={onUpload} />}
         <textarea
           ref={textareaRef}
@@ -48,6 +48,7 @@ function ChatInput({ onSend, onStop, onUpload, isReplying, disabled: disabledPro
           }}
           onKeyDown={handleKeyDown}
           placeholder="Ask anything…"
+          aria-label="Message"
           className="flex-1 resize-none bg-transparent px-2 py-2 text-gray-100 placeholder-gray-500 outline-none"
         />
         {isReplying ? (
@@ -67,7 +68,7 @@ function ChatInput({ onSend, onStop, onUpload, isReplying, disabled: disabledPro
           </button>
         )}
       </div>
-      <p className="mt-2 text-center text-xs text-gray-500">
+      <p className="mt-2 text-center text-xs text-gray-400">
         Enter to send · Shift+Enter for a new line
       </p>
     </div>

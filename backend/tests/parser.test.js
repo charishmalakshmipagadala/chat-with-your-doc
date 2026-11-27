@@ -15,6 +15,10 @@ test('short text stays one chunk, with whitespace cleaned up', () => {
   assert.deepEqual(chunkText('Hello\n\n   world.  '), ['Hello world.'])
 })
 
+test('NUL characters are removed (Postgres cannot store them)', () => {
+  assert.deepEqual(chunkText('Hello\u0000 wor\u0000ld.'), ['Hello world.'])
+})
+
 test('long text: every chunk is at most `size` characters', () => {
   const chunks = chunkText(sentences(200), { size: 800, overlap: 150 })
   assert.ok(chunks.length > 1)

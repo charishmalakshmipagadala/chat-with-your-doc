@@ -5,10 +5,10 @@
 // Request body:  { "conversationId": "<uuid>", "content": "What is SSE?" }
 // Response:      data: {"text":"Hel"}\n\n  ...  data: {"sources":[...]}\n\n  data: [DONE]\n\n
 import { pool, withTransaction } from '../db/pool.js'
-import { readJson, HttpError, assertUuid } from '../lib/http.js'
+import { readJson, HttpError, assertUuid, stripNul } from '../lib/http.js'
 import { startSSE, sendEvent, endSSE } from '../lib/sse.js'
 import { streamReply } from '../services/llm.js'
-import { findRelevantChunks, MIN_SCORE } from '../services/retrieval.js'
+import { findRelevantChunks, sampleDocumentChunks, MIN_SCORE } from '../services/retrieval.js'
 import { buildRagUserMessage, toSources, RAG_SYSTEM_PROMPT } from '../services/ragPrompt.js'
 
 const MAX_CONTENT_LENGTH = 20_000 // characters in one message
@@ -26,7 +26,7 @@ function validateBody(body) {
   }
   assertUuid(body.conversationId, 'Conversation')
 
-  const content = typeof body.content === 'string' ? body.content.trim() : ''
+  const content = typeof body.content === 'string' ? stripNul(body.content).trim() : ''
   if (!content) throw new HttpError(400, '"content" must be non-empty text')
   if (content.length > MAX_CONTENT_LENGTH) {
     throw new HttpError(400, `Message too long (max ${MAX_CONTENT_LENGTH} characters)`)
@@ -113,11 +113,17 @@ async function buildPrompt(conversation, content) {
   }
 
   const history = await loadHistory(conversation.id, MAX_HISTORY_MESSAGES_RAG)
-  const chunks = await findRelevantChunks(conversation.documentId, content, { minScore: MIN_SCORE })
+  let chunks = await findRelevantChunks(conversation.documentId, content, { minScore: MIN_SCORE })
+
+  // Broad questions ("What is this about?", "Summarize it") don't closely
+  // match any single chunk. Instead of telling Claude "nothing matched",
+  // give it a spread of the whole document so it can still give an overview.
+  const overview = chunks.length === 0
+  if (overview) chunks = await sampleDocumentChunks(conversation.documentId)
 
   history[history.length - 1] = {
     role: 'user',
-    content: buildRagUserMessage(conversation.documentName, chunks, content),
+    content: buildRagUserMessage(conversation.documentName, chunks, content, { overview }),
   }
   return { messages: history, system: RAG_SYSTEM_PROMPT, sources: toSources(chunks) }
 }
