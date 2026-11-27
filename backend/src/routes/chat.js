@@ -9,7 +9,12 @@ import { readJson, HttpError, assertUuid, stripNul } from '../lib/http.js'
 import { startSSE, sendEvent, endSSE } from '../lib/sse.js'
 import { streamReply } from '../services/llm.js'
 import { findRelevantChunks, sampleDocumentChunks, MIN_SCORE } from '../services/retrieval.js'
-import { buildRagUserMessage, toSources, RAG_SYSTEM_PROMPT } from '../services/ragPrompt.js'
+import {
+  buildRagUserMessage,
+  toSources,
+  mergeChunks,
+  RAG_SYSTEM_PROMPT,
+} from '../services/ragPrompt.js'
 
 const MAX_CONTENT_LENGTH = 20_000 // characters in one message
 const MAX_HISTORY_MESSAGES = 40 // how many recent messages Claude sees (normal chats)
@@ -17,6 +22,7 @@ const MAX_HISTORY_MESSAGES = 40 // how many recent messages Claude sees (normal 
 // carry the facts, so a short history keeps the prompt small and focused.
 const MAX_HISTORY_MESSAGES_RAG = 7
 const TITLE_LENGTH = 40
+const CLOSEST_IN_OVERVIEW = 3 // closest chunks included even when below MIN_SCORE
 
 // Check the body before we start streaming. Once streaming starts we can no
 // longer send a 400, so all validation has to happen up front.
@@ -113,13 +119,23 @@ async function buildPrompt(conversation, content) {
   }
 
   const history = await loadHistory(conversation.id, MAX_HISTORY_MESSAGES_RAG)
-  let chunks = await findRelevantChunks(conversation.documentId, content, { minScore: MIN_SCORE })
+  const candidates = await findRelevantChunks(conversation.documentId, content) // best 5, any score
+  let chunks = candidates.filter((c) => c.score >= MIN_SCORE)
 
-  // Broad questions ("What is this about?", "Summarize it") don't closely
-  // match any single chunk. Instead of telling Claude "nothing matched",
-  // give it a spread of the whole document so it can still give an overview.
+  // Nothing scored above the cutoff. Two common reasons:
+  //  - a broad question ("What is this about?") that matches no single chunk
+  //  - a real match that scores low, e.g. dense resume text (tested: "Where
+  //    did I study?" ranked the education chunk FIRST, but at only 0.155)
+  // So give Claude the closest chunks anyway, plus a spread of the whole
+  // document, and say they're general context. The system prompt still makes
+  // it answer "couldn't find it" if none of them contain the answer.
   const overview = chunks.length === 0
-  if (overview) chunks = await sampleDocumentChunks(conversation.documentId)
+  if (overview) {
+    chunks = mergeChunks(
+      candidates.slice(0, CLOSEST_IN_OVERVIEW),
+      await sampleDocumentChunks(conversation.documentId),
+    )
+  }
 
   history[history.length - 1] = {
     role: 'user',

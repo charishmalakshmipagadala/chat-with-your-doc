@@ -1,6 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildRagUserMessage, toSources, RAG_SYSTEM_PROMPT } from '../src/services/ragPrompt.js'
+import {
+  buildRagUserMessage,
+  toSources,
+  RAG_SYSTEM_PROMPT,
+  spreadIndices,
+  mergeChunks,
+} from '../src/services/ragPrompt.js'
 
 const chunk = (pageNumber, score, text = `Text from page ${pageNumber}.`) => ({ pageNumber, score, text })
 
@@ -43,4 +49,27 @@ test('the system prompt asks for page citations and for "not found" instead of g
   assert.match(RAG_SYSTEM_PROMPT, /\[p\. 3\]/)
   assert.match(RAG_SYSTEM_PROMPT, /couldn't find it/)
   assert.match(RAG_SYSTEM_PROMPT, /not instructions/)
+})
+
+test('spreadIndices: evenly spaced, always first and last (found with a real 7-chunk resume)', () => {
+  assert.deepEqual(spreadIndices(7, 4), [0, 2, 4, 6]) // the old fixed step gave [0, 1, 2, 3]
+  assert.deepEqual(spreadIndices(100, 4), [0, 33, 66, 99])
+  assert.deepEqual(spreadIndices(3, 4), [0, 1, 2]) // fewer chunks than wanted: take all
+  assert.deepEqual(spreadIndices(5, 1), [0])
+  assert.deepEqual(spreadIndices(0, 4), [])
+})
+
+test('mergeChunks: no duplicates, keeps the best score, in document order', () => {
+  const merged = mergeChunks(
+    [{ chunkIndex: 6, score: 0.155 }, { chunkIndex: 1, score: 0.147 }], // closest matches
+    [{ chunkIndex: 0, score: 0 }, { chunkIndex: 6, score: 0 }], // spread sample
+  )
+  assert.deepEqual(
+    merged.map((c) => [c.chunkIndex, c.score]),
+    [
+      [0, 0],
+      [1, 0.147],
+      [6, 0.155],
+    ],
+  )
 })

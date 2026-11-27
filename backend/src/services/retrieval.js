@@ -4,6 +4,7 @@
 import pgvector from 'pgvector'
 import { pool } from '../db/pool.js'
 import { embedText } from './embeddings.js'
+import { spreadIndices } from './ragPrompt.js'
 
 export const DEFAULT_TOP_K = 5 // how many chunks to give Claude
 // Chunks scoring below this are treated as "not related". Measured on our test
@@ -57,10 +58,9 @@ export async function sampleDocumentChunks(documentId, { maxChunks = 4, maxChars
        FROM chunks WHERE document_id = $1 ORDER BY chunk_index`,
     [documentId],
   )
-  const step = Math.max(1, Math.floor(rows.length / maxChunks))
   const sample = []
   let chars = 0
-  for (let i = 0; i < rows.length && sample.length < maxChunks; i += step) {
+  for (const i of spreadIndices(rows.length, maxChunks)) {
     if (chars + rows[i].text.length > maxChars && sample.length > 0) break
     sample.push({ ...rows[i], score: 0 })
     chars += rows[i].text.length

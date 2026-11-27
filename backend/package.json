@@ -4,7 +4,7 @@
   "description": "Plain Node.js backend (no framework) for Chat with your Doc",
   "main": "src/server.js",
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --env-file-if-exists=.env --test tests/",
     "dev": "node --watch --env-file=.env src/server.js",
     "start": "node --env-file=.env src/server.js",
     "migrate": "node --env-file=.env src/db/migrate.js"

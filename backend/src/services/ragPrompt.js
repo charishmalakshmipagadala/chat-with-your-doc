@@ -34,7 +34,7 @@ export function buildRagUserMessage(documentName, chunks, question, { overview =
       : '(No part of the document matched this question.)'
 
   const header = overview
-    ? `No excerpt closely matched this question, so here are parts from across the document "${documentName}" for general context:`
+    ? `No excerpt closely matched this question, so here are the closest parts plus parts from across the document "${documentName}" for general context:`
     : `Excerpts from the document "${documentName}":`
 
   return `${header}
@@ -61,4 +61,33 @@ export function toSources(chunks) {
       score: Number(c.score.toFixed(3)),
       excerpt: c.text.slice(0, 240),
     }))
+}
+
+// ---- Choosing context when no chunk matched well -----------------------------
+
+/**
+ * `count` evenly spaced positions from 0 to total-1, always including the
+ * first and the last. spreadIndices(7, 4) → [0, 2, 4, 6].
+ * (A fixed step like Math.floor(7 / 4) = 1 would give [0, 1, 2, 3]: only the
+ * beginning of the document.)
+ */
+export function spreadIndices(total, count) {
+  if (total <= count) return Array.from({ length: total }, (_, i) => i)
+  if (count === 1) return [0]
+  const picked = new Set()
+  for (let i = 0; i < count; i++) picked.add(Math.round((i * (total - 1)) / (count - 1)))
+  return [...picked]
+}
+
+/**
+ * Combine chunk lists without duplicates (the same chunk keeps its best
+ * score), in document order so Claude reads them in the order they appear.
+ */
+export function mergeChunks(...lists) {
+  const byIndex = new Map()
+  for (const chunk of lists.flat()) {
+    const seen = byIndex.get(chunk.chunkIndex)
+    if (!seen || chunk.score > seen.score) byIndex.set(chunk.chunkIndex, chunk)
+  }
+  return [...byIndex.values()].sort((a, b) => a.chunkIndex - b.chunkIndex)
 }
