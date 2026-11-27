@@ -21,7 +21,9 @@ async function request(path, { method = 'GET', body } = {}) {
 /** @returns {Promise<{ id, title, documentId, createdAt, updatedAt }[]>} newest first */
 export const listConversations = () => request('/api/conversations')
 
-export const createConversation = () => request('/api/conversations', { method: 'POST', body: {} })
+/** @param {string | null} documentId  link the new chat to this document (optional) */
+export const createConversation = (documentId = null) =>
+  request('/api/conversations', { method: 'POST', body: documentId ? { documentId } : {} })
 
 /** @returns {Promise<{ conversation, messages: { id, role, content }[] }>} */
 export const getConversation = (id) => request(`/api/conversations/${id}/messages`)
@@ -57,7 +59,9 @@ export async function uploadDocument(file) {
 // ---- Chat streaming ---------------------------------------------------------
 
 /**
- * Read a Server-Sent Events stream and yield the text pieces it contains.
+ * Read a Server-Sent Events stream and yield the events it contains:
+ *   { type: 'text', text: 'Hel' }                 a piece of the reply
+ *   { type: 'sources', sources: [{ pageNumber, score, excerpt }] }   pages used (document chats)
  *
  * The network delivers bytes in arbitrary chunks — one chunk may hold half an
  * event, or three events. So we keep a buffer, and only handle text up to the
@@ -87,7 +91,8 @@ export async function* readSSE(body) {
 
         const parsed = JSON.parse(data)
         if (parsed.error) throw new Error(parsed.error)
-        if (parsed.text) yield parsed.text
+        if (parsed.text) yield { type: 'text', text: parsed.text }
+        if (parsed.sources) yield { type: 'sources', sources: parsed.sources }
       }
     }
   } finally {
@@ -96,10 +101,10 @@ export async function* readSSE(body) {
 }
 
 /**
- * Send one new message and yield the reply as it streams in.
- * The server saves both and loads the earlier history itself.
+ * Send one new message and yield the reply's events as they stream in
+ * (see readSSE). The server saves both and loads the earlier history itself.
  *
- *   for await (const text of streamChat(chatId, 'Hello', { signal })) { ... }
+ *   for await (const event of streamChat(chatId, 'Hello', { signal })) { ... }
  *
  * @param {string} conversationId
  * @param {string} content  the new user message

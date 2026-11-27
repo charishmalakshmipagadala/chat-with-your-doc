@@ -22,18 +22,20 @@ function getClient() {
  * rest of the app can't tell them apart.
  *
  * @param {{ role: 'user' | 'assistant', content: string }[]} messages  the whole conversation so far
- * @param {{ signal?: AbortSignal }} options  abort this to stop mid-reply
+ * @param {{ signal?: AbortSignal, system?: string }} options
+ *   signal: abort this to stop mid-reply
+ *   system: instructions for Claude (default: a general assistant)
  */
 export function streamReply(messages, options = {}) {
   return config.fakeLlm ? streamFakeReply(messages, options) : streamClaudeReply(messages, options)
 }
 
-async function* streamClaudeReply(messages, { signal } = {}) {
+async function* streamClaudeReply(messages, { signal, system = SYSTEM_PROMPT } = {}) {
   const stream = getClient().beta.messages.stream(
     {
       model: config.model,
       max_tokens: 64000,
-      system: SYSTEM_PROMPT,
+      system,
       messages,
       // How hard Claude thinks before answering: low | medium | high | xhigh | max
       output_config: { effort: 'medium' },
@@ -61,16 +63,23 @@ async function* streamClaudeReply(messages, { signal } = {}) {
 const FAKE_WORD_DELAY_MS = 40
 
 // Pretends to be Claude: streams a canned Markdown reply word by word.
-async function* streamFakeReply(messages, { signal } = {}) {
-  const question = messages.at(-1).content
-  const reply =
-    `🧪 **Fake mode**: no AI was called (\`FAKE_LLM=true\` in \`.env\`).\n\n` +
-    `You asked: _"${question.slice(0, 200)}"_\n\n` +
-    `This reply is streamed **word by word**, just like a real one:\n\n` +
-    `- the server sends each piece as an SSE event\n` +
-    `- the browser adds it to the message as it arrives\n` +
-    `- pressing **Stop** cancels the stream\n\n` +
-    `Set \`FAKE_LLM=false\` to talk to Claude for real.`
+// With a custom system prompt (document chats), it shows the exact prompt
+// Claude would have received — handy for seeing how RAG works.
+async function* streamFakeReply(messages, { signal, system } = {}) {
+  const lastMessage = messages.at(-1).content
+  const reply = system
+    ? `🧪 **Fake mode**: no AI was called. Here is exactly what Claude would receive.\n\n` +
+      `**System prompt:**\n\n\`\`\`text\n${system}\n\`\`\`\n\n` +
+      `**Conversation:** ${messages.length} message(s). The last one:\n\n` +
+      `\`\`\`text\n${lastMessage}\n\`\`\`\n\n` +
+      `Set \`FAKE_LLM=false\` to get a real answer from Claude.`
+    : `🧪 **Fake mode**: no AI was called (\`FAKE_LLM=true\` in \`.env\`).\n\n` +
+      `You asked: _"${lastMessage.slice(0, 200)}"_\n\n` +
+      `This reply is streamed **word by word**, just like a real one:\n\n` +
+      `- the server sends each piece as an SSE event\n` +
+      `- the browser adds it to the message as it arrives\n` +
+      `- pressing **Stop** cancels the stream\n\n` +
+      `Set \`FAKE_LLM=false\` to talk to Claude for real.`
 
   // Split into words but keep the spaces/newlines, so Markdown stays intact.
   for (const piece of reply.split(/(?<=\s)/)) {

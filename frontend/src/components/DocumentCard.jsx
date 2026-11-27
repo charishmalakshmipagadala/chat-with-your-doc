@@ -7,7 +7,7 @@ const BADGES = {
   failed: { label: 'Failed', className: 'bg-red-900/60 text-red-300' },
 }
 
-function DocumentCard({ document }) {
+function DocumentCard({ document, onChat, disabled }) {
   const badge = BADGES[document.status] ?? BADGES.failed
 
   return (
@@ -24,7 +24,19 @@ function DocumentCard({ document }) {
           {badge.label}
         </span>
         {document.status === 'ready' && (
-          <span className="text-xs text-gray-500">{document.chunkCount} chunks</span>
+          <>
+            <span className="text-xs text-gray-500">{document.chunkCount} chunks</span>
+            {onChat && (
+              <button
+                onClick={() => onChat(document)}
+                disabled={disabled}
+                title={`Start a chat about ${document.filename}`}
+                className="ml-auto rounded bg-indigo-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
+              >
+                💬 Chat
+              </button>
+            )}
+          </>
         )}
       </div>
 

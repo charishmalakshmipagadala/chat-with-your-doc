@@ -10,6 +10,26 @@ function TypingDots() {
   )
 }
 
+// The document pages an answer was based on. Hover (or focus) a chip to see
+// the excerpt that was used from that page.
+function Sources({ sources }) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-gray-800 pt-2">
+      <span className="text-xs text-gray-500">Sources:</span>
+      {sources.map((s) => (
+        <span
+          key={s.pageNumber}
+          tabIndex={0}
+          title={`Page ${s.pageNumber} (match ${Math.round(s.score * 100)}%)\n\n“${s.excerpt}…”`}
+          className="cursor-help rounded-full border border-indigo-800 bg-indigo-950/60 px-2 py-0.5 text-xs text-indigo-300 hover:bg-indigo-900"
+        >
+          📄 p. {s.pageNumber}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 // One message. User messages are a bubble on the right;
 // assistant messages sit on the left and are rendered as Markdown.
 function MessageBubble({ message }) {
@@ -23,7 +43,7 @@ function MessageBubble({ message }) {
     )
   }
 
-  const { content, streaming, stopped, error } = message
+  const { content, streaming, stopped, error, sources } = message
   const waitingForFirstWord = streaming && !content
 
   return (
@@ -41,6 +61,8 @@ function MessageBubble({ message }) {
             ⚠️ {error}
           </p>
         )}
+
+        {sources?.length > 0 && <Sources sources={sources} />}
       </div>
     </div>
   )

@@ -2,7 +2,16 @@ import DocumentCard from './DocumentCard.jsx'
 
 // Left column: "New chat" button, list of past chats, and uploaded documents.
 // It holds no data of its own — App passes everything in as props.
-function Sidebar({ conversations, activeId, onSelect, onNewChat, onDelete, disabled, documents }) {
+function Sidebar({
+  conversations,
+  activeId,
+  onSelect,
+  onNewChat,
+  onDelete,
+  disabled,
+  documents,
+  onChatWithDocument,
+}) {
   function handleDelete(e, chat) {
     e.stopPropagation() // don't also open the chat we're deleting
     if (window.confirm(`Delete "${chat.title}"? This can't be undone.`)) onDelete(chat.id)
@@ -36,10 +45,12 @@ function Sidebar({ conversations, activeId, onSelect, onNewChat, onDelete, disab
             <button
               onClick={() => onSelect(c.id)}
               disabled={disabled}
+              title={c.documentName ? `About: ${c.documentName}` : undefined}
               className={`flex-1 truncate px-3 py-2 text-left text-sm ${
                 c.id === activeId ? 'text-white' : 'text-gray-300'
               }`}
             >
+              {c.documentId && <span aria-label="Document chat">📄 </span>}
               {c.title}
             </button>
             <button
@@ -61,7 +72,9 @@ function Sidebar({ conversations, activeId, onSelect, onNewChat, onDelete, disab
           {documents.length === 0 ? (
             <p className="px-2 text-sm text-gray-500">Upload a PDF with 📎 to get started.</p>
           ) : (
-            documents.map((d) => <DocumentCard key={d.id} document={d} />)
+            documents.map((d) => (
+              <DocumentCard key={d.id} document={d} onChat={onChatWithDocument} disabled={disabled} />
+            ))
           )}
         </div>
       </section>

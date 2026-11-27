@@ -16,10 +16,12 @@ const makeTitle = (text) => text.replace(/\s+/g, ' ').trim().slice(0, TITLE_LENG
  *
  * activeId === null means "a new chat that isn't saved yet". It's created on
  * the server when you send its first message, so empty chats don't pile up.
+ * draftDocument: the document that new chat will be about (or null).
  */
 export function useChat() {
   const [conversations, setConversations] = useState([])
   const [activeId, setActiveId] = useState(null)
+  const [draftDocument, setDraftDocument] = useState(null) // { id, filename } | null
   const [messages, setMessages] = useState([])
   const [isReplying, setIsReplying] = useState(false)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
@@ -47,6 +49,7 @@ export function useChat() {
     if (isReplying || id === activeId) return
     openingRef.current = id
     setActiveId(id)
+    setDraftDocument(null)
     setMessages([])
     setError(null)
     setIsLoadingMessages(true)
@@ -65,9 +68,15 @@ export function useChat() {
   }
 
   function newChat() {
+    startDocumentChat(null)
+  }
+
+  /** A new (not yet saved) chat about `document` — or a plain chat if null. */
+  function startDocumentChat(document) {
     if (isReplying) return
     openingRef.current = null
     setActiveId(null)
+    setDraftDocument(document ? { id: document.id, filename: document.filename } : null)
     setMessages([])
     setError(null)
     setIsLoadingMessages(false)
@@ -113,10 +122,11 @@ export function useChat() {
       // A brand-new chat is created on the server only now.
       let chatId = activeId
       if (!chatId) {
-        const created = await api.createConversation()
+        const created = await api.createConversation(draftDocument?.id ?? null)
         chatId = created.id
         openingRef.current = chatId
         setActiveId(chatId)
+        setDraftDocument(null) // it's a real chat now; its document is on `created`
         setConversations((prev) => [created, ...prev])
       }
 
@@ -128,8 +138,12 @@ export function useChat() {
         return chat ? [{ ...chat, title: isFirstMessage ? makeTitle(text) : chat.title }, ...others] : prev
       })
 
-      for await (const piece of api.streamChat(chatId, text, { signal: controller.signal })) {
-        updateReply(replyId, (m) => ({ content: m.content + piece }))
+      for await (const event of api.streamChat(chatId, text, { signal: controller.signal })) {
+        if (event.type === 'text') {
+          updateReply(replyId, (m) => ({ content: m.content + event.text }))
+        } else if (event.type === 'sources') {
+          updateReply(replyId, () => ({ sources: event.sources }))
+        }
       }
     } catch (err) {
       if (controller.signal.aborted) {
@@ -149,14 +163,22 @@ export function useChat() {
     abortRef.current?.abort()
   }
 
+  // The document the open chat is about (saved chat or unsaved draft), or null.
+  const activeChat = conversations.find((c) => c.id === activeId)
+  const activeDocument = activeChat?.documentId
+    ? { id: activeChat.documentId, filename: activeChat.documentName }
+    : draftDocument
+
   return {
     conversations,
     activeId,
+    activeDocument,
     messages,
     isReplying,
     isLoadingMessages,
     error,
     newChat,
+    startDocumentChat,
     selectChat,
     deleteChat,
     send,

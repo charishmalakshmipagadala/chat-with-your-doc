@@ -48,3 +48,9 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at       timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages (conversation_id, id);
+
+-- ---- Changes added later (each one is safe to run again) -------------------
+
+-- Day 5: the document pages an assistant answer was based on, e.g.
+-- [{"pageNumber": 3, "score": 0.61, "excerpt": "..."}]. NULL for normal chats.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS sources jsonb;
